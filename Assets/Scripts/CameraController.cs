@@ -12,9 +12,15 @@ public class CameraController : MonoBehaviour
     public Canvas initialCanvas; // Reference to the initial canvas
     public GameObject ExitButton;
     public Slider transitionSpeedSlider; // Slider to control transition speed
+    public Toggle directTransitionToggle; // Toggle to enable/disable direct transition
+
+    // Prefab for Next and Previous buttons (assign these in the Inspector)
+    public Button nextButtonPrefab;
+    public Button previousButtonPrefab;
 
     private int Counter = -1; // This should start at -1 to ensure the first move is correct
     private float transitionSpeed = 2f;
+    private bool directTransition = false; // Direct transition flag
 
     private void Start()
     {
@@ -24,6 +30,17 @@ public class CameraController : MonoBehaviour
 
         // Set up slider listener for transition speed
         transitionSpeedSlider.onValueChanged.AddListener(UpdateTransitionSpeed);
+        transitionSpeedSlider.value = transitionSpeed; // Initialize slider value
+
+        // Set up toggle listener for direct transition
+        directTransitionToggle.onValueChanged.AddListener(UpdateDirectTransition);
+        directTransitionToggle.isOn = false; // Ensure the toggle starts off
+
+        // Add buttons to each canvas
+        foreach (Canvas canvas in roomCanvases)
+        {
+            AddNavigationButtons(canvas);
+        }
     }
 
     private void DisableAllCanvases()
@@ -50,13 +67,27 @@ public class CameraController : MonoBehaviour
         transitionSpeed = value;
     }
 
+    private void UpdateDirectTransition(bool isOn)
+    {
+        directTransition = isOn;
+    }
+
     private void MoveCamera()
     {
         if (Counter >= 0 && Counter < roomPositions.Length && roomPositions[Counter] != null)
         {
-            transform.DOMove(roomPositions[Counter].transform.position, transitionSpeed).SetEase(Ease.InOutSine);
-            transform.rotation = roomPositions[Counter].transform.rotation; // Set camera rotation
-
+            if (directTransition)
+            {
+                // Directly move camera without animation
+                transform.position = roomPositions[Counter].transform.position;
+                transform.rotation = roomPositions[Counter].transform.rotation;
+            }
+            else
+            {
+                // Move camera with animation
+                transform.DOMove(roomPositions[Counter].transform.position, transitionSpeed).SetEase(Ease.InOutSine);
+                transform.DORotateQuaternion(roomPositions[Counter].transform.rotation, transitionSpeed).SetEase(Ease.InOutSine);
+            }
             ActivateCanvas(Counter);
         }
     }
@@ -75,7 +106,8 @@ public class CameraController : MonoBehaviour
         Counter++;
         if (Counter >= roomPositions.Length)
         {
-            Counter = 0; // Loop back to the first room
+            // Restart the game loop
+            Counter = 0;
             MoveCamera();
             initialCanvas.gameObject.SetActive(true); // Activate the initial canvas
 
@@ -112,15 +144,38 @@ public class CameraController : MonoBehaviour
 
     public void ExitApp()
     {
-        #if UNITY_EDITOR
+#if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
-        #else
+#else
         Application.Quit();
-        #endif
+#endif
     }
 
     private void RestartApplication()
     {
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    private void AddNavigationButtons(Canvas canvas)
+    {
+        // Instantiate Next button and set its properties
+        Button nextButton = Instantiate(nextButtonPrefab, canvas.transform);
+        nextButton.name = "NextButton";
+        nextButton.onClick.AddListener(() => NextScene());
+        RectTransform nextButtonRectTransform = nextButton.GetComponent<RectTransform>();
+        nextButtonRectTransform.anchorMin = new Vector2(1, 0);
+        nextButtonRectTransform.anchorMax = new Vector2(1, 0);
+        nextButtonRectTransform.pivot = new Vector2(1, 0);
+        nextButtonRectTransform.anchoredPosition = new Vector2(-10, 10);
+
+        // Instantiate Previous button and set its properties
+        Button previousButton = Instantiate(previousButtonPrefab, canvas.transform);
+        previousButton.name = "PreviousButton";
+        previousButton.onClick.AddListener(() => Previous());
+        RectTransform previousButtonRectTransform = previousButton.GetComponent<RectTransform>();
+        previousButtonRectTransform.anchorMin = new Vector2(0, 0);
+        previousButtonRectTransform.anchorMax = new Vector2(0, 0);
+        previousButtonRectTransform.pivot = new Vector2(0, 0);
+        previousButtonRectTransform.anchoredPosition = new Vector2(10, 10);
     }
 }
